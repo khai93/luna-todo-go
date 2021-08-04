@@ -37,11 +37,27 @@ type InstanceData struct {
 	Url             string `json:"url"`
 }
 
-var lunaAuth = LunaAuth{"admin", "secretphrase2"}
-var lunaUrl = fmt.Sprintf("http://%s:%s@localhost:5000", lunaAuth.user, lunaAuth.pass)
+func getAuth() (*LunaAuth, error) {
+	username := os.Getenv("LUNA_AUTH_USER")
+	if username == "" {
+		return nil, errors.New("ENV var 'LUNA_AUTH_USER' is not defined.")
+	}
+
+	password := os.Getenv("LUNA_AUTH_PASS")
+	if password == "" {
+		return nil, errors.New("ENV var 'LUNA_AUTH_PASS' is not defined.")
+	}
+
+	return &LunaAuth{username, password}, nil
+}
 
 func getServiceData() (*ServiceData, error) {
-	serviceFile, err := os.Open("service.json")
+	serviceConfigPath := os.Getenv("CONFIG_PATH")
+	if serviceConfigPath == "" {
+		serviceConfigPath = "service.json"
+	}
+
+	serviceFile, err := os.Open(serviceConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +81,18 @@ func StartService() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	lunaAuth, err := getAuth()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	lunaRegistryHost := os.Getenv("LUNA_REGISTRY_HOST")
+	if lunaRegistryHost == "" {
+		log.Fatal(errors.New("'LUNA_REGISTRY_HOST' is required and was not found."))
+	}
+
+	lunaUrl := fmt.Sprintf("http://%s:%s@%s", lunaAuth.user, lunaAuth.pass, lunaRegistryHost)
 
 	instanceId := fmt.Sprintf("%s:localhost:4000", serviceData.Name)
 	instanceUrl := fmt.Sprintf("%s/registry/v1/instances/%s", lunaUrl, instanceId)
